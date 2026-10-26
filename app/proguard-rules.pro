@@ -1,1 +1,8 @@
-# Aletheia – keep rules minimal for now
+-keep class com.realityfilter.app.** { *; }
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**

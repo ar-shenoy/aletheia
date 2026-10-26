@@ -1,38 +1,36 @@
 # Aletheia
 
-**Local-first pattern recognition for human communication.**
+Local-first pattern recognition for human communication. No accounts. No servers.
 
-No accounts. No servers. On-device analysis.
-
-## v0.5 features
+## v0.6
 
 | Tab | Capability |
 |-----|------------|
-| Analyze | Hybrid matching (keywords + embeddings) |
-| Patterns | Full library + detail |
+| Analyze | Hybrid matching |
+| Patterns | Library + detail |
 | Mirror | Bias profile + bookmarks |
-| Talk | Continuous multi-turn sessions (Room-persisted) |
-| Live | Camera OCR overlay |
-| Packs | Toggle packs + **import JSON from file** |
+| Talk | Continuous sessions + **past session history** |
+| Live | Camera OCR overlay (persists hits) |
+| Packs | Toggle + **import file/URL** |
 
-### Matching
-- `HashEmbeddingProvider` always available
-- `OnDeviceModelEmbeddingProvider` loads `assets/models/text_encoder.tflite` when present (TFLite)
-- `EmbeddingFactory` picks the best available backend
+Also: 16 seed detectors, safer seed migration, adaptive icon, ProGuard rules, matcher unit tests, pack contribution docs.
 
-### Seed library
-16 built-in detectors + modular packs under `assets/packs/`.
+### Optional neural embeddings
+
+Place a TFLite encoder at `app/src/main/assets/models/text_encoder.tflite`. Without it, hash embeddings are used.
 
 ### Build
 
 ```bash
 git clone https://github.com/ar-shenoy/aletheia.git
-cd aletheia
-# Android Studio, or:
-# place gradle-wrapper.jar then: ./gradlew :app:assembleDebug
 ```
 
-Optional encoder: `scripts/download_encoder.sh` then drop a `.tflite` into `app/src/main/assets/models/text_encoder.tflite`.
+Open in Android Studio (API 26+) → sync → run.
+
+```bash
+./gradlew test
+./gradlew :app:assembleDebug
+```
 
 ## License
 
