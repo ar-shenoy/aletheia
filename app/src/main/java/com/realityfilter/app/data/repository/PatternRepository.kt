@@ -7,6 +7,7 @@ import com.realityfilter.app.domain.model.Pattern
 import com.realityfilter.app.domain.model.PatternCategory
 import com.realityfilter.app.domain.model.Severity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import java.io.BufferedReader
@@ -26,40 +27,49 @@ class PatternRepository(
         patternDao.getPatternById(id)?.toDomain()
 
     suspend fun seedPatternsIfEmpty() {
-        // Always (re)load seed for v0.1 so library stays current after updates.
-        // Later: only insert when table is empty.
-        loadSeedPatternsFromAssets()
+        val existing = patternDao.getAllPatterns().first()
+        if (existing.isEmpty()) {
+            loadSeedPatternsFromAssets(replaceAll = true)
+        } else {
+            loadSeedPatternsFromAssets(replaceAll = false)
+        }
     }
 
-    private suspend fun loadSeedPatternsFromAssets() {
+    private suspend fun loadSeedPatternsFromAssets(replaceAll: Boolean) {
         try {
-            val inputStream = context.assets.open("seed_patterns.json")
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            val jsonString = reader.readText()
-            reader.close()
-
+            val jsonString = context.assets.open("seed_patterns.json").use { input ->
+                BufferedReader(InputStreamReader(input)).readText()
+            }
             val jsonArray = JSONArray(jsonString)
             val entities = mutableListOf<PatternEntity>()
-
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
-                val entity = PatternEntity(
-                    id = obj.getString("id"),
-                    name = obj.getString("name"),
-                    category = PatternCategory.valueOf(obj.getString("category")),
-                    description = obj.getString("description"),
-                    detectionHints = jsonArrayToList(obj.getJSONArray("detectionHints")),
-                    examples = jsonArrayToList(obj.getJSONArray("examples")),
-                    counterMeasures = jsonArrayToList(obj.optJSONArray("counterMeasures") ?: JSONArray()),
-                    historicalAnalogs = jsonArrayToList(obj.optJSONArray("historicalAnalogs") ?: JSONArray()),
-                    severity = Severity.valueOf(obj.getString("severity")),
-                    tags = jsonArrayToList(obj.optJSONArray("tags") ?: JSONArray()),
-                    version = obj.optInt("version", 1)
+                entities.add(
+                    PatternEntity(
+                        id = obj.getString("id"),
+                        name = obj.getString("name"),
+                        category = PatternCategory.valueOf(obj.getString("category")),
+                        description = obj.getString("description"),
+                        detectionHints = jsonArrayToList(obj.getJSONArray("detectionHints")),
+                        examples = jsonArrayToList(obj.optJSONArray("examples") ?: JSONArray()),
+                        counterMeasures = jsonArrayToList(obj.optJSONArray("counterMeasures") ?: JSONArray()),
+                        historicalAnalogs = jsonArrayToList(obj.optJSONArray("historicalAnalogs") ?: JSONArray()),
+                        severity = Severity.valueOf(obj.optString("severity", "MEDIUM")),
+                        tags = jsonArrayToList(obj.optJSONArray("tags") ?: JSONArray()),
+                        version = obj.optInt("version", 1)
+                    )
                 )
-                entities.add(entity)
             }
-
-            patternDao.insertPatterns(entities)
+            if (replaceAll) {
+                patternDao.insertPatterns(entities)
+            } else {
+                val current = patternDao.getAllPatterns().first().associateBy { it.id }
+                val toUpsert = entities.filter { e ->
+                    val old = current[e.id]
+                    old == null || e.version > old.version
+                }
+                if (toUpsert.isNotEmpty()) patternDao.insertPatterns(toUpsert)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -67,23 +77,14 @@ class PatternRepository(
 
     private fun jsonArrayToList(array: JSONArray): List<String> {
         val list = mutableListOf<String>()
-        for (i in 0 until array.length()) {
-            list.add(array.getString(i))
-        }
+        for (i in 0 until array.length()) list.add(array.getString(i))
         return list
     }
 
     private fun PatternEntity.toDomain() = Pattern(
-        id = id,
-        name = name,
-        category = category,
-        description = description,
-        detectionHints = detectionHints,
-        examples = examples,
-        counterMeasures = counterMeasures,
-        historicalAnalogs = historicalAnalogs,
-        severity = severity,
-        tags = tags,
-        version = version
+        id = id, name = name, category = category, description = description,
+        detectionHints = detectionHints, examples = examples,
+        counterMeasures = counterMeasures, historicalAnalogs = historicalAnalogs,
+        severity = severity, tags = tags, version = version
     )
 }
