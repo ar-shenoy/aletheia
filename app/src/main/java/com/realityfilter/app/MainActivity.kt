@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Mic
@@ -36,17 +38,21 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.realityfilter.app.data.local.RealityFilterDatabase
 import com.realityfilter.app.data.repository.ObservationRepository
+import com.realityfilter.app.data.repository.PatternPackRepository
 import com.realityfilter.app.data.repository.PatternRepository
 import com.realityfilter.app.domain.model.BiasProfile
+import com.realityfilter.app.domain.model.ConversationSession
 import com.realityfilter.app.domain.model.Observation
 import com.realityfilter.app.domain.model.Pattern
 import com.realityfilter.app.domain.model.SourceType
-import com.realityfilter.app.ml.PatternMatcher
+import com.realityfilter.app.ml.HybridPatternMatcher
 import com.realityfilter.app.ml.SpeechHelper
 import com.realityfilter.app.ml.TextRecognizerHelper
 import com.realityfilter.app.ui.screens.BiasMirrorScreen
 import com.realityfilter.app.ui.screens.ConversationScreen
 import com.realityfilter.app.ui.screens.HomeScreen
+import com.realityfilter.app.ui.screens.LiveScanScreen
+import com.realityfilter.app.ui.screens.PacksScreen
 import com.realityfilter.app.ui.screens.PatternDetailScreen
 import com.realityfilter.app.ui.screens.PatternsScreen
 import com.realityfilter.app.ui.theme.AletheiaTheme
@@ -70,20 +76,32 @@ class MainActivity : ComponentActivity() {
             database.observationDao(),
             database.analysisSessionDao()
         )
-        val matcher = PatternMatcher()
+        val packRepository = PatternPackRepository(this)
+        val hybridMatcher = HybridPatternMatcher()
         val textRecognizer = TextRecognizerHelper(this)
 
         lifecycleScope.launch {
             patternRepository.seedPatternsIfEmpty()
+            packRepository.loadPacks()
         }
 
         setContent {
             AletheiaTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val patterns by patternRepository.getAllPatterns()
+                    val patternsFromDb by patternRepository.getAllPatterns()
                         .collectAsState(initial = emptyList())
+                    val packs by packRepository.packs.collectAsState()
                     val bookmarks by observationRepository.getBookmarkedObservations()
                         .collectAsState(initial = emptyList())
+
+                    val patterns = remember(packs, patternsFromDb) {
+                        val fromPacks = packRepository.enabledPatterns()
+                        if (fromPacks.isNotEmpty()) fromPacks else patternsFromDb
+                    }
+
+                    LaunchedEffect(patterns) {
+                        if (patterns.isNotEmpty()) hybridMatcher.prepare(patterns)
+                    }
 
                     var selectedTab by remember { mutableIntStateOf(0) }
                     var biasProfile by remember { mutableStateOf(BiasProfile()) }
@@ -91,8 +109,10 @@ class MainActivity : ComponentActivity() {
                     var isOcrRunning by remember { mutableStateOf(false) }
                     var selectedPattern by remember { mutableStateOf<Pattern?>(null) }
                     var isListening by remember { mutableStateOf(false) }
+                    var continuousMode by remember { mutableStateOf(true) }
                     var transcript by remember { mutableStateOf("") }
                     var conversationObs by remember { mutableStateOf<List<Observation>>(emptyList()) }
+                    var conversationSession by remember { mutableStateOf<ConversationSession?>(null) }
                     val scope = rememberCoroutineScope()
 
                     LaunchedEffect(selectedTab, patterns) {
@@ -104,7 +124,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val imagePicker = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.GetContent()
+                        ActivityResultContracts.GetContent()
                     ) { uri: Uri? ->
                         if (uri != null) {
                             isOcrRunning = true
@@ -129,49 +149,35 @@ class MainActivity : ComponentActivity() {
                     ) { granted ->
                         if (granted) {
                             isListening = true
-                            startSpeech { partial, finalText, _ ->
-                                if (partial != null) transcript = partial
+                            if (conversationSession == null) conversationSession = ConversationSession()
+                            startSpeech(continuousMode) { _, finalText, _ ->
                                 if (finalText != null) {
                                     transcript = if (transcript.isBlank()) finalText else "$transcript $finalText"
-                                    isListening = false
+                                    conversationSession = conversationSession?.appendSegment(finalText, true)
+                                    if (!continuousMode) isListening = false
                                 }
                             }
                         }
                     }
 
                     if (selectedPattern != null) {
-                        PatternDetailScreen(
-                            pattern = selectedPattern!!,
-                            onBack = { selectedPattern = null }
-                        )
+                        PatternDetailScreen(pattern = selectedPattern!!, onBack = { selectedPattern = null })
                     } else {
                         Scaffold(
                             bottomBar = {
                                 NavigationBar {
-                                    NavigationBarItem(
-                                        selected = selectedTab == 0,
-                                        onClick = { selectedTab = 0 },
-                                        icon = { Icon(Icons.Default.Home, contentDescription = "Analyze") },
-                                        label = { Text("Analyze") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = selectedTab == 1,
-                                        onClick = { selectedTab = 1 },
-                                        icon = { Icon(Icons.Default.List, contentDescription = "Patterns") },
-                                        label = { Text("Patterns") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = selectedTab == 2,
-                                        onClick = { selectedTab = 2 },
-                                        icon = { Icon(Icons.Default.Psychology, contentDescription = "Mirror") },
-                                        label = { Text("Mirror") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = selectedTab == 3,
-                                        onClick = { selectedTab = 3 },
-                                        icon = { Icon(Icons.Default.Mic, contentDescription = "Talk") },
-                                        label = { Text("Talk") }
-                                    )
+                                    NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 },
+                                        icon = { Icon(Icons.Default.Home, contentDescription = "Analyze") }, label = { Text("Analyze") })
+                                    NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 },
+                                        icon = { Icon(Icons.Default.List, contentDescription = "Patterns") }, label = { Text("Patterns") })
+                                    NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2 },
+                                        icon = { Icon(Icons.Default.Psychology, contentDescription = "Mirror") }, label = { Text("Mirror") })
+                                    NavigationBarItem(selected = selectedTab == 3, onClick = { selectedTab = 3 },
+                                        icon = { Icon(Icons.Default.Mic, contentDescription = "Talk") }, label = { Text("Talk") })
+                                    NavigationBarItem(selected = selectedTab == 4, onClick = { selectedTab = 4 },
+                                        icon = { Icon(Icons.Default.CameraAlt, contentDescription = "Live") }, label = { Text("Live") })
+                                    NavigationBarItem(selected = selectedTab == 5, onClick = { selectedTab = 5 },
+                                        icon = { Icon(Icons.Default.Extension, contentDescription = "Packs") }, label = { Text("Packs") })
                                 }
                             }
                         ) { padding ->
@@ -181,7 +187,7 @@ class MainActivity : ComponentActivity() {
                                     initialText = sharedText ?: ocrText,
                                     isOcrRunning = isOcrRunning,
                                     onAnalyze = { text ->
-                                        val results = matcher.analyze(text, patterns)
+                                        val results = hybridMatcher.analyze(text, patterns, SourceType.MANUAL_TEXT)
                                         scope.launch(Dispatchers.IO) {
                                             observationRepository.saveAnalysis(
                                                 observations = results,
@@ -196,9 +202,7 @@ class MainActivity : ComponentActivity() {
                                         results
                                     },
                                     onToggleBookmark = { obs ->
-                                        scope.launch(Dispatchers.IO) {
-                                            observationRepository.toggleBookmark(obs)
-                                        }
+                                        scope.launch(Dispatchers.IO) { observationRepository.toggleBookmark(obs) }
                                     },
                                     onPickImage = { imagePicker.launch("image/*") },
                                     modifier = Modifier.padding(padding)
@@ -215,7 +219,10 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.padding(padding)
                                 )
                                 3 -> ConversationScreen(
+                                    session = conversationSession,
                                     isListening = isListening,
+                                    continuousMode = continuousMode,
+                                    onContinuousChange = { continuousMode = it },
                                     transcript = transcript,
                                     observations = conversationObs,
                                     patterns = patterns,
@@ -225,11 +232,12 @@ class MainActivity : ComponentActivity() {
                                         ) == PackageManager.PERMISSION_GRANTED
                                         if (granted) {
                                             isListening = true
-                                            startSpeech { partial, finalText, _ ->
-                                                if (partial != null) transcript = partial
+                                            if (conversationSession == null) conversationSession = ConversationSession()
+                                            startSpeech(continuousMode) { _, finalText, _ ->
                                                 if (finalText != null) {
                                                     transcript = if (transcript.isBlank()) finalText else "$transcript $finalText"
-                                                    isListening = false
+                                                    conversationSession = conversationSession?.appendSegment(finalText, true)
+                                                    if (!continuousMode) isListening = false
                                                 }
                                             }
                                         } else {
@@ -241,16 +249,32 @@ class MainActivity : ComponentActivity() {
                                         speechHelper?.stop()
                                     },
                                     onAnalyzeTranscript = {
-                                        val results = matcher.analyze(transcript, patterns)
+                                        val results = hybridMatcher.analyze(transcript, patterns, SourceType.CONVERSATION)
                                         conversationObs = results
+                                        conversationSession = conversationSession?.withObservations(results.map { it.id })
                                         scope.launch(Dispatchers.IO) {
-                                            observationRepository.saveAnalysis(
-                                                observations = results,
-                                                sourceType = SourceType.CONVERSATION,
-                                                sourceText = transcript
-                                            )
+                                            observationRepository.saveAnalysis(results, SourceType.CONVERSATION, transcript)
                                         }
                                     },
+                                    onEndSession = {
+                                        isListening = false
+                                        speechHelper?.stop()
+                                        conversationSession = null
+                                        transcript = ""
+                                        conversationObs = emptyList()
+                                    },
+                                    modifier = Modifier.padding(padding)
+                                )
+                                4 -> LiveScanScreen(
+                                    patterns = patterns,
+                                    onFrameAnalyzed = { text ->
+                                        hybridMatcher.analyze(text, patterns, SourceType.LIVE_CAMERA)
+                                    },
+                                    modifier = Modifier.padding(padding)
+                                )
+                                5 -> PacksScreen(
+                                    manifests = packRepository.manifests(),
+                                    onToggle = { id, enabled -> packRepository.setPackEnabled(id, enabled) },
                                     modifier = Modifier.padding(padding)
                                 )
                             }
@@ -261,13 +285,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startSpeech(callback: (String?, String?, String?) -> Unit) {
+    private fun startSpeech(continuous: Boolean, callback: (String?, String?, String?) -> Unit) {
         speechHelper?.stop()
         speechHelper = SpeechHelper(
             context = this,
             onPartial = { callback(it, null, null) },
             onFinal = { callback(null, it, null) },
-            onError = { callback(null, null, it) }
+            onError = { callback(null, null, it) },
+            continuous = continuous
         )
         speechHelper?.start()
     }
