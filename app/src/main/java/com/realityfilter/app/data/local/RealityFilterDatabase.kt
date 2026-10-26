@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.realityfilter.app.data.local.entities.AnalysisSessionEntity
+import com.realityfilter.app.data.local.entities.ConversationSessionEntity
 import com.realityfilter.app.data.local.entities.Converters
 import com.realityfilter.app.data.local.entities.ObservationEntity
 import com.realityfilter.app.data.local.entities.PatternEntity
@@ -14,9 +15,10 @@ import com.realityfilter.app.data.local.entities.PatternEntity
     entities = [
         PatternEntity::class,
         ObservationEntity::class,
-        AnalysisSessionEntity::class
+        AnalysisSessionEntity::class,
+        ConversationSessionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -25,6 +27,7 @@ abstract class RealityFilterDatabase : RoomDatabase() {
     abstract fun patternDao(): PatternDao
     abstract fun observationDao(): ObservationDao
     abstract fun analysisSessionDao(): AnalysisSessionDao
+    abstract fun conversationSessionDao(): ConversationSessionDao
 
     companion object {
         @Volatile
