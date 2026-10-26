@@ -1,33 +1,38 @@
 # Aletheia
 
-**A local-first instrument for seeing the patterns that shape reality.**
+**Local-first pattern recognition for human communication.**
 
-Fully on-device Android app. No accounts. No tracking. No servers.
+No accounts. No servers. On-device analysis.
 
-## Features (v0.4)
+## v0.5 features
 
 | Tab | Capability |
 |-----|------------|
-| **Analyze** | Paste / share / image OCR → hybrid pattern matching |
-| **Patterns** | Library + detail |
-| **Mirror** | Personal bias profile + bookmarks |
-| **Talk** | Continuous multi-turn speech sessions |
-| **Live** | Camera overlay: OCR + live pattern chips |
-| **Packs** | Enable/disable modular detector packs |
+| Analyze | Hybrid matching (keywords + embeddings) |
+| Patterns | Full library + detail |
+| Mirror | Bias profile + bookmarks |
+| Talk | Continuous multi-turn sessions (Room-persisted) |
+| Live | Camera OCR overlay |
+| Packs | Toggle packs + **import JSON from file** |
 
-### Stronger matching
-Hybrid scorer: keyword hints + local hash embeddings (swap-in path for TF-Lite encoders).
+### Matching
+- `HashEmbeddingProvider` always available
+- `OnDeviceModelEmbeddingProvider` loads `assets/models/text_encoder.tflite` when present (TFLite)
+- `EmbeddingFactory` picks the best available backend
 
-### Modular packs
-Core seed + community JSON under `assets/packs/`.
+### Seed library
+16 built-in detectors + modular packs under `assets/packs/`.
 
-## Build
+### Build
 
 ```bash
 git clone https://github.com/ar-shenoy/aletheia.git
+cd aletheia
+# Android Studio, or:
+# place gradle-wrapper.jar then: ./gradlew :app:assembleDebug
 ```
 
-Open in Android Studio → Gradle sync → Run (API 26+).
+Optional encoder: `scripts/download_encoder.sh` then drop a `.tflite` into `app/src/main/assets/models/text_encoder.tflite`.
 
 ## License
 
