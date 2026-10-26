@@ -22,11 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.realityfilter.app.domain.model.BiasProfile
+import com.realityfilter.app.domain.model.Observation
+import com.realityfilter.app.domain.model.Pattern
 import com.realityfilter.app.domain.model.PatternInsight
 
 @Composable
 fun BiasMirrorScreen(
     profile: BiasProfile,
+    bookmarkedObservations: List<Observation> = emptyList(),
+    patterns: List<Pattern> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -82,13 +86,38 @@ fun BiasMirrorScreen(
             )
         } else {
             val maxCount = profile.topPatterns.maxOf { it.occurrenceCount }.coerceAtLeast(1)
-
             LazyColumn(
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(profile.topPatterns, key = { it.patternId }) { insight ->
                     InsightCard(insight = insight, maxCount = maxCount)
+                }
+                if (bookmarkedObservations.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Bookmarked signals",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    items(bookmarkedObservations.take(10), key = { it.id }) { obs ->
+                        val name = patterns.find { it.id == obs.patternId }?.name ?: obs.patternId
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(text = name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = "Confidence ${(obs.confidence * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -119,24 +148,18 @@ private fun InsightCard(insight: PatternInsight, maxCount: Int) {
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-
             Spacer(modifier = Modifier.height(4.dp))
-
             Text(
                 text = insight.category.displayName(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             LinearProgressIndicator(
                 progress = { insight.occurrenceCount.toFloat() / maxCount },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             )
-
             Spacer(modifier = Modifier.height(6.dp))
-
             Text(
                 text = "Avg confidence ${(insight.averageConfidence * 100).toInt()}%",
                 style = MaterialTheme.typography.labelLarge,
