@@ -3,23 +3,23 @@ package com.realityfilter.app.ml
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import java.util.Locale
 
-/**
- * On-device speech recognition wrapper for Conversation mode.
- * Uses Android SpeechRecognizer (offline engines when available on device).
- */
 class SpeechHelper(
     private val context: Context,
     private val onPartial: (String) -> Unit,
     private val onFinal: (String) -> Unit,
-    private val onError: (String) -> Unit
+    private val onError: (String) -> Unit,
+    private val continuous: Boolean = false
 ) {
     private var recognizer: SpeechRecognizer? = null
     private var isRunning = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
@@ -29,7 +29,11 @@ class SpeechHelper(
             onError("Speech recognition not available on this device")
             return
         }
+        beginListening()
+    }
 
+    private fun beginListening() {
+        recognizer?.destroy()
         recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { sr ->
             sr.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
@@ -37,16 +41,30 @@ class SpeechHelper(
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
+
                 override fun onError(error: Int) {
-                    isRunning = false
-                    onError("Speech error code $error")
+                    if (continuous && isRunning && error != SpeechRecognizer.ERROR_CLIENT) {
+                        mainHandler.postDelayed({
+                            if (isRunning) beginListening()
+                        }, 400)
+                    } else if (!continuous) {
+                        isRunning = false
+                        onError("Speech error code $error")
+                    }
                 }
 
                 override fun onResults(results: Bundle?) {
-                    isRunning = false
                     val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val best = texts?.firstOrNull().orEmpty()
                     if (best.isNotBlank()) onFinal(best)
+
+                    if (continuous && isRunning) {
+                        mainHandler.postDelayed({
+                            if (isRunning) beginListening()
+                        }, 300)
+                    } else {
+                        isRunning = false
+                    }
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -72,6 +90,7 @@ class SpeechHelper(
 
     fun stop() {
         isRunning = false
+        mainHandler.removeCallbacksAndMessages(null)
         recognizer?.stopListening()
         recognizer?.cancel()
         recognizer?.destroy()
