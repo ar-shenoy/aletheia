@@ -19,52 +19,60 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.realityfilter.app.domain.model.ConversationSession
 import com.realityfilter.app.domain.model.Observation
 import com.realityfilter.app.domain.model.Pattern
 
 @Composable
 fun ConversationScreen(
+    session: ConversationSession?,
     isListening: Boolean,
+    continuousMode: Boolean,
+    onContinuousChange: (Boolean) -> Unit,
     transcript: String,
     observations: List<Observation>,
     patterns: List<Pattern>,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
     onAnalyzeTranscript: () -> Unit,
+    onEndSession: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = modifier.fillMaxSize().padding(16.dp)
     ) {
+        Text(text = "Conversation mode", style = MaterialTheme.typography.displayLarge)
         Text(
-            text = "Conversation mode",
-            style = MaterialTheme.typography.displayLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Opt-in live listening. Transcript stays on this device. Stop anytime.",
+            text = "Multi-turn sessions. Continuous mode keeps listening across pauses. Nothing leaves the device.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f)
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(text = "Continuous multi-turn", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Switch(checked = continuousMode, onCheckedChange = onContinuousChange)
+        }
+        if (session != null) {
+            Text(
+                text = "Session · ${session.segments.size} segments · ${session.fullTranscript.length} chars",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!isListening) {
                 Button(onClick = onStartListening, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Mic, contentDescription = null)
                     Spacer(modifier = Modifier.padding(4.dp))
-                    Text("Start listening")
+                    Text("Start")
                 }
             } else {
                 OutlinedButton(onClick = onStopListening, modifier = Modifier.weight(1f)) {
@@ -73,21 +81,19 @@ fun ConversationScreen(
                     Text("Stop")
                 }
             }
-            Button(
-                onClick = onAnalyzeTranscript,
-                enabled = transcript.isNotBlank(),
-                modifier = Modifier.weight(1f)
-            ) {
+            Button(onClick = onAnalyzeTranscript, enabled = transcript.isNotBlank(), modifier = Modifier.weight(1f)) {
                 Text("Analyze")
             }
         }
-
+        if (session != null && session.segments.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onEndSession, modifier = Modifier.fillMaxWidth()) {
+                Text("End session")
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
-
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp),
+            modifier = Modifier.fillMaxWidth().height(160.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -98,30 +104,20 @@ fun ConversationScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = transcript.ifBlank { "Spoken words will appear here (on-device speech recognition)." },
+                    text = transcript.ifBlank { "Spoken words accumulate here across turns." },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = if (transcript.isBlank()) 0.5f else 0.9f
-                    )
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (transcript.isBlank()) 0.5f else 0.9f)
                 )
             }
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-
         Text(
-            text = if (observations.isEmpty()) "No signals yet"
-            else "${observations.size} signal${if (observations.size == 1) "" else "s"}",
+            text = if (observations.isEmpty()) "No signals yet" else "${observations.size} signals",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold
         )
-
         Spacer(modifier = Modifier.height(8.dp))
-
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f)
-        ) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
             items(observations, key = { it.id }) { obs ->
                 val pattern = patterns.find { it.id == obs.patternId }
                 Card(
@@ -129,21 +125,10 @@ fun ConversationScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = pattern?.name ?: obs.patternId,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Confidence ${(obs.confidence * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Text(text = pattern?.name ?: obs.patternId, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(text = "Confidence ${(obs.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = obs.explanation.take(200),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text(text = obs.explanation.take(200), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
