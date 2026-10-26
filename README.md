@@ -2,49 +2,46 @@
 
 **A local-first instrument for seeing the patterns that shape reality.**
 
-Aletheia (ἀλήθεια) means *unconcealment* — truth as the act of revealing what is hidden.
+Aletheia (ἀλήθεια) means *unconcealment* — truth as disclosure.
 
-Open-source Android app. Fully on-device. No accounts. No tracking. No servers.
+Fully on-device Android app. No accounts. No tracking. No servers.
 
-## Features (v0.2)
+## Features (v0.3)
 
-- **Analyze** — paste text or share from other apps; run local pattern detection
-- **Image OCR** — pick an image, extract text with ML Kit (on-device), then analyze
-- **Pattern Library** — browse detectors by category with severity badges
-- **Personal Bias Mirror** — sees which patterns appear most often in *your* analyses (local only)
-- **Persistence** — bookmarks + analysis sessions stored in Room (SQLite)
-- **Share sheet** — appears in Android share menu for `text/plain`
+| Tab | What it does |
+|-----|----------------|
+| **Analyze** | Paste text, share from other apps, or OCR an image → local pattern detection |
+| **Patterns** | Browse the detector library by category; open full detail (signals, examples, counter-moves) |
+| **Mirror** | Personal bias profile from *your* analyses + bookmarked signals |
+| **Talk** | Opt-in conversation mode: on-device speech → transcript → analyze |
 
-## Tech
-
-- Kotlin + Jetpack Compose + Material 3
-- Room (local SQLite)
-- ML Kit Text Recognition (on-device OCR)
-- Transparent heuristic `PatternMatcher` (ready for on-device embeddings later)
+Also:
+- Room persistence (sessions, observations, bookmarks)
+- Share sheet (`text/plain`)
+- ML Kit on-device OCR
+- Transparent heuristic matcher (seed detectors)
 
 ## Build
 
-1. Clone: `git clone https://github.com/ar-shenoy/aletheia.git`
-2. Open in Android Studio (Ladybug+)
-3. Let Gradle sync
-4. Run on device/emulator (API 26+)
-
 ```bash
-./gradlew assembleDebug
+git clone https://github.com/ar-shenoy/aletheia.git
 ```
 
-> Note: First open may require generating default launcher icons in Android Studio (New → Image Asset) if `mipmap` resources are missing.
+Open in Android Studio (Ladybug+) → Gradle sync → Run (API 26+).
+
+Generate launcher icons if missing: **File → New → Image Asset**.
 
 ## Privacy
 
-- All analysis runs on-device
-- Nothing is sent to a server
-- Bias Mirror is built only from content you choose to analyze
+Everything runs on-device. Bias Mirror is built only from content you choose to analyze.
+
+## Roadmap (next)
+
+- Stronger matching (embeddings / small on-device LLM)
+- Live camera overlay annotations
+- Modular community pattern packs
+- Continuous conversation listening with clearer session boundaries
 
 ## License
 
 MIT
-
----
-
-*Named after the Greek concept of truth as disclosure.*
