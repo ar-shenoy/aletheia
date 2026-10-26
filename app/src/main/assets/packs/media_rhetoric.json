@@ -1,0 +1,75 @@
+{
+  "id": "media_rhetoric",
+  "name": "Media & framing",
+  "description": "Community pack: headline framing, selective quotation, and media techniques.",
+  "author": "Aletheia Community",
+  "version": 1,
+  "license": "MIT",
+  "patterns": [
+    {
+      "id": "headline_mismatch",
+      "name": "Headline–body mismatch",
+      "category": "MEDIA_TECHNIQUE",
+      "description": "The headline implies a stronger, more emotional, or different claim than the article body supports.",
+      "detectionHints": [
+        "headline claims certainty body hedges",
+        "outrage title soft conclusion",
+        "clickbait title vs measured text",
+        "title omits the important caveat"
+      ],
+      "examples": [
+        "Headline: 'Study proves X causes Y'. Body: small correlational study with many limitations."
+      ],
+      "counterMeasures": [
+        "Read past the headline before updating beliefs.",
+        "Compare the title claim to the strongest claim the body actually makes."
+      ],
+      "historicalAnalogs": [],
+      "severity": "HIGH",
+      "tags": ["media", "framing", "headline"]
+    },
+    {
+      "id": "selective_quotation",
+      "name": "Selective quotation",
+      "category": "MEDIA_TECHNIQUE",
+      "description": "Quoting a fragment that reverses or exaggerates the speaker's intended meaning.",
+      "detectionHints": [
+        "quote out of context",
+        "ellipsis removing the qualifier",
+        "partial quote changes meaning",
+        "soundbite instead of full statement"
+      ],
+      "examples": [
+        "Cutting 'I do not believe that...' so only the opposite-sounding clause remains."
+      ],
+      "counterMeasures": [
+        "Seek the full paragraph or primary source.",
+        "Ask what was left out of the quote."
+      ],
+      "historicalAnalogs": [],
+      "severity": "HIGH",
+      "tags": ["media", "quote", "context"]
+    },
+    {
+      "id": "both_sides_false_balance",
+      "name": "False balance",
+      "category": "MEDIA_TECHNIQUE",
+      "description": "Presenting a fringe view as equally supported by evidence as a well-established one for the appearance of neutrality.",
+      "detectionHints": [
+        "experts disagree framing without weight of evidence",
+        "both sides when one side lacks evidence",
+        "false equivalence of consensus and outlier"
+      ],
+      "examples": [
+        "Equal airtime to climate science and denial as if the evidence bases were comparable."
+      ],
+      "counterMeasures": [
+        "Ask for the weight of evidence, not just presence of disagreement.",
+        "Check whether 'both sides' reflects reality or a narrative need."
+      ],
+      "historicalAnalogs": [],
+      "severity": "MEDIUM",
+      "tags": ["media", "balance", "evidence"]
+    }
+  ]
+}
